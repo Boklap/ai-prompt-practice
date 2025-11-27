@@ -26,6 +26,10 @@ You have won multiple **Game of the Year** awards and are known for:
 
 ### Context
 - Build a snake game that will be played in the terminal.
+- User Interface Size:
+	- Width: 32
+	- Height: 18
+- Make sure to display the User Interface in the middle.
 - Player and condition:
 	- This snake game will be played by office worker (employee).
 	- This office worker is working in software technology stuff like creating website or mobile software.
@@ -35,13 +39,27 @@ You have won multiple **Game of the Year** awards and are known for:
 	- There will be two pages:
 		- Main menu
 			- There are two menus: play and exit.
-			- Art or styles that showing snake and an apple.
+			- Art or styles as a background that showing snake and an apple.
 			- Display the game name on the top of the menus.
+			- Don't put any border on the menu.
 		- Game area
 			- a high score text on the top left corner with the current score
+			- Symbols:
+				- Walls:
+					- Top Left: ╭
+					- Top Right: ╮
+					- Bottom Left: ╰
+					- Bottom Right: ╯
+					- Vertical: │
+					- Horizontal: ─
+				- Snake head and body: █
+				- Apple: Ó
+			- Snake's head and body will have different color.
 - Main Menu mechanics:
-	- The user could navigate between each menus by pressing arrow key.
-	- Enter key will be used to select the menu.
+	- The menu will be displayed in vertical list.
+	- The user could navigate between each menus by pressing up or down arrow key.
+	- The current selected menu will have different color.
+	- If the user press the enter keyboard then it will be used to select the menu.
 - Game mechanics:
 	- This game will be played by using keyboard.
 	- Input keys (WASD for movement):

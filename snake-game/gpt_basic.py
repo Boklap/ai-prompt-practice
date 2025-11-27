@@ -1,205 +1,153 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
-Snake Terminal Edition - Minimalist Tech Style (Final Polished Version)
-Author: Generated Concept 1
-Environment: Linux Alpine Terminal
-Python: 3.15.0a2
-Libraries: Only standard Python libraries
+terminal_snake_minimal.py
+Minimalist Terminal Snake Game
 """
 
-import os
-import sys
-import termios
-import tty
-import time
-import json
-import random
+import curses, random, time, os, json
 
-# -------------------------
-# Terminal color codes (ANSI)
-# -------------------------
-class Colors:
-    SNAKE = '\033[92m'  # Green
-    FOOD = '\033[91m'   # Red
-    WALL = '\033[97m'   # White
-    RESET = '\033[0m'
+WIDTH, HEIGHT, FPS, SPEED_BOOST, MAX_FOOD = 64, 18, 12, 1.2, 3
+SCORE_FILE = os.path.expanduser("~/score/score.json")
 
-# -------------------------
-# Directions mapping
-# -------------------------
-DIRECTIONS = {'w': (-1, 0), 's': (1, 0), 'a': (0, -1), 'd': (0, 1)}
-
-# -------------------------
 # Symbols
-# -------------------------
-SNAKE_CHAR = '█'
-FOOD_CHAR = '●'
-WALL_CHAR = '#'
-EMPTY_CHAR = ' '
+WALL_TL, WALL_TR, WALL_BL, WALL_BR = "╭","╮","╰","╯"
+WALL_V, WALL_H = "│","─"
+SNAKE_HEAD, SNAKE_BODY, APPLE = "█","▓","Ó"
 
-# -------------------------
-# High score file path
-# -------------------------
-SCORE_FILE = os.path.expanduser('~/score/score.json')
+# Colors
+COLOR_HEAD, COLOR_BODY, COLOR_APPLE = 2,3,1
+COLOR_MENU_SELECTED, COLOR_MENU_NORMAL = 4,7
 
-# -------------------------
-# Load high score
-# -------------------------
 def load_highscore():
     if os.path.exists(SCORE_FILE):
-        try:
-            with open(SCORE_FILE, 'r') as f:
-                return json.load(f).get('highscore', 0)
-        except:
-            return 0
+        with open(SCORE_FILE,"r") as f:
+            return json.load(f).get("highscore",0)
     return 0
 
-# -------------------------
-# Save high score
-# -------------------------
 def save_highscore(score):
-    os.makedirs(os.path.dirname(SCORE_FILE), exist_ok=True)
-    with open(SCORE_FILE, 'w') as f:
-        json.dump({'highscore': score}, f)
+    os.makedirs(os.path.dirname(SCORE_FILE),exist_ok=True)
+    with open(SCORE_FILE,"w") as f:
+        json.dump({"highscore":score},f)
 
-# -------------------------
-# Get single key press
-# -------------------------
-def getch():
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        ch = sys.stdin.read(1)
-        return ch
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+def draw_centered(stdscr, lines):
+    h,w = stdscr.getmaxyx()
+    for i,line in enumerate(lines):
+        x = w//2 - len(line)//2
+        y = h//2 - len(lines)//2 + i
+        stdscr.addstr(y,x,line)
 
-# -------------------------
-# Clear terminal screen
-# -------------------------
-def clear():
-    os.system('clear')
-
-# -------------------------
-# Draw main menu
-# -------------------------
-def draw_menu(selected=0):
-    clear()
-    print("  ______             _        _______                  _ _ ")
-    print(" / ____/___  ____ _ (_)___   / ____(_)________  ____ _(_) |")
-    print("/ /   / __ \/ __ `/ / / __ \ / /   / / ___/ _ \/ __ `/ / |")
-    print("/ /___/ /_/ / /_/ / / / / / // /___/ / /  /  __/ /_/ / / |")
-    print("\____/\____/\__, /_/_/_/ /_/ \____/_/_/   \___/\__, /_/|_|")
-    print("           /____/                               /____/      \n")
-    print("      {}{}{}       {}{}{}       {}{}{}".format(
-        SNAKE_CHAR, Colors.SNAKE, Colors.RESET,
-        FOOD_CHAR, Colors.FOOD, Colors.RESET,
-        SNAKE_CHAR, Colors.SNAKE, Colors.RESET))
-    menu_items = ['Play', 'Exit']
-    for i, item in enumerate(menu_items):
-        prefix = '➤ ' if i == selected else '  '
-        print(f"{prefix}{item}")
-
-# -------------------------
-# Draw game board
-# -------------------------
-def draw_board(snake, foods, score, width, height):
-    clear()
-    print(f"Score: {score}  Highscore: {load_highscore()}")
-    for y in range(height):
-        line = ''
-        for x in range(width):
-            if (y, x) in snake:
-                line += f"{Colors.SNAKE}{SNAKE_CHAR}{Colors.RESET}"
-            elif (y, x) in foods:
-                line += f"{Colors.FOOD}{FOOD_CHAR}{Colors.RESET}"
-            elif y == 0 or y == height-1 or x == 0 or x == width-1:
-                line += f"{Colors.WALL}{WALL_CHAR}{Colors.RESET}"
-            else:
-                line += EMPTY_CHAR
-        print(line)
-
-# -------------------------
-# Main game loop
-# -------------------------
-def game_loop():
-    width, height = 30, 15
-    snake = [(height // 2, width // 2)]
-    direction = 'd'
-    score = 0
-    foods = []
-
-    # Spawn initial foods
-    while len(foods) < 3:
-        pos = (random.randint(1, height-2), random.randint(1, width-2))
-        if pos not in snake and pos not in foods:
-            foods.append(pos)
-
+def main_menu(stdscr):
+    curses.curs_set(0)
+    stdscr.nodelay(0)
+    stdscr.timeout(-1)
+    current_selection = 0
+    menu = ["Play","Exit"]
+    menu_art = ["   █████   Ó  ","  █     █    ","   █   █     ","    █ █      ","     █       "]
     while True:
-        draw_board(snake, foods, score, width, height)
-
-        start = time.time()
-        key = getch()
-        speed = 0.05  # default frame
-        if key in DIRECTIONS:
-            direction = key
-        elif key == ' ':
-            speed = 0.03  # speed up
-
-        dy, dx = DIRECTIONS[direction]
-        new_head = (snake[0][0] + dy, snake[0][1] + dx)
-
-        # Collision detection
-        if (new_head in snake) or new_head[0] == 0 or new_head[0] == height-1 or new_head[1] == 0 or new_head[1] == width-1:
-            print("You lose! Press Enter to return to main menu.")
-            input()
-            return
-
-        snake.insert(0, new_head)
-
-        # Eat food
-        if new_head in foods:
-            foods.remove(new_head)
-            score += 10
-            while len(foods) < 3:
-                pos = (random.randint(1, height-2), random.randint(1, width-2))
-                if pos not in snake and pos not in foods:
-                    foods.append(pos)
-        else:
-            snake.pop()
-
-        # Win condition
-        if len(snake) >= (width-2)*(height-2):
-            print("You win! Press Enter to return to main menu.")
-            save_highscore(score)
-            input()
-            return
-
-        # Maintain 60 FPS
-        elapsed = time.time() - start
-        time.sleep(max(speed - elapsed, 0))
-
-# -------------------------
-# Main menu loop
-# -------------------------
-def main():
-    selected = 0
-    while True:
-        draw_menu(selected)
-        key = getch()
-        if key == 'w':
-            selected = (selected -1) % 2
-        elif key == 's':
-            selected = (selected +1) % 2
-        elif key == '\r':
-            if selected == 0:
-                game_loop()
+        stdscr.clear()
+        draw_centered(stdscr, ["Terminal Snake"]+[""]+menu_art+[""])
+        h,w = stdscr.getmaxyx()
+        for idx,item in enumerate(menu):
+            x = w//2 - len(item)//2
+            y = h//2 + 5 + idx
+            if idx==current_selection:
+                stdscr.attron(curses.color_pair(COLOR_MENU_SELECTED))
+                stdscr.addstr(y,x,item)
+                stdscr.attroff(curses.color_pair(COLOR_MENU_SELECTED))
             else:
-                clear()
-                sys.exit()
+                stdscr.attron(curses.color_pair(COLOR_MENU_NORMAL))
+                stdscr.addstr(y,x,item)
+                stdscr.attroff(curses.color_pair(COLOR_MENU_NORMAL))
+        key = stdscr.getch()
+        if key in [curses.KEY_UP, ord('w')]: current_selection=(current_selection-1)%len(menu)
+        elif key in [curses.KEY_DOWN, ord('s')]: current_selection=(current_selection+1)%len(menu)
+        elif key in [curses.KEY_ENTER, ord('\n')]: return menu[current_selection]
+        stdscr.refresh()
 
-if __name__ == "__main__":
-    main()
+def draw_game(stdscr,snake,apples,score,highscore):
+    stdscr.clear()
+    stdscr.addstr(0,0,f"Score: {score}  Highscore: {highscore}")
+    for y in range(HEIGHT+2):
+        for x in range(WIDTH+2):
+            char=""
+            if y==0 and x==0: char=WALL_TL
+            elif y==0 and x==WIDTH+1: char=WALL_TR
+            elif y==HEIGHT+1 and x==0: char=WALL_BL
+            elif y==HEIGHT+1 and x==WIDTH+1: char=WALL_BR
+            elif y==0 or y==HEIGHT+1: char=WALL_H
+            elif x==0 or x==WIDTH+1: char=WALL_V
+            if char: stdscr.addstr(y,x,char)
+    stdscr.attron(curses.color_pair(COLOR_APPLE))
+    for ax,ay in apples: stdscr.addstr(ay+1,ax+1,APPLE)
+    stdscr.attroff(curses.color_pair(COLOR_APPLE))
+    for i,(sx,sy) in enumerate(snake):
+        if i==0: stdscr.attron(curses.color_pair(COLOR_HEAD)); stdscr.addstr(sy+1,sx+1,SNAKE_HEAD); stdscr.attroff(curses.color_pair(COLOR_HEAD))
+        else: stdscr.attron(curses.color_pair(COLOR_BODY)); stdscr.addstr(sy+1,sx+1,SNAKE_BODY); stdscr.attroff(curses.color_pair(COLOR_BODY))
+    stdscr.refresh()
+
+def spawn_apple(snake,apples):
+    empty=[(x,y) for x in range(WIDTH) for y in range(HEIGHT) if (x,y) not in snake and (x,y) not in apples]
+    if empty and len(apples)<MAX_FOOD: apples.append(random.choice(empty))
+
+def message_center(stdscr,message,score,highscore):
+    stdscr.nodelay(0)
+    h,w = stdscr.getmaxyx()
+    for i in range(len(message)+1):
+        draw_centered(stdscr,[message[:i]])
+        stdscr.refresh()
+        time.sleep(0.1)
+    draw_centered(stdscr,[message,f"Score: {score} Highscore: {highscore}","Press Enter to return"])
+    save_highscore(highscore)
+    while True:
+        key=stdscr.getch()
+        if key in [ord('\n'), curses.KEY_ENTER]: return
+
+def game_loop(stdscr):
+    curses.curs_set(0)
+    stdscr.nodelay(1)
+    stdscr.timeout(1000//FPS)
+    highscore = load_highscore()
+    snake=[(WIDTH//2,HEIGHT//2)]
+    direction=(0,-1)
+    apples=[]
+    score=0
+    spawn_apple(snake,apples)
+    last_time=time.time()
+    while True:
+        key=stdscr.getch()
+        if key in [ord('w')] and direction!=(0,1): direction=(0,-1)
+        elif key in [ord('s')] and direction!=(0,-1): direction=(0,1)
+        elif key in [ord('a')] and direction!=(1,0): direction=(-1,0)
+        elif key in [ord('d')] and direction!=(-1,0): direction=(1,0)
+        speed=SPEED_BOOST if key==ord(' ') else 1.0
+        now=time.time()
+        if now-last_time<1/FPS/speed: continue
+        last_time=now
+        hx,hy=snake[0]
+        new_head=(hx+direction[0],hy+direction[1])
+        if new_head in snake or new_head[0]<0 or new_head[0]>=WIDTH or new_head[1]<0 or new_head[1]>=HEIGHT:
+            message_center(stdscr,"You Lose",score,highscore); return
+        snake.insert(0,new_head)
+        if new_head in apples:
+            apples.remove(new_head); score+=10; spawn_apple(snake,apples); highscore=max(highscore,score)
+        else: snake.pop()
+        if len(snake)==WIDTH*HEIGHT: message_center(stdscr,"You Win",score,highscore); return
+        draw_game(stdscr,snake,apples,score,highscore)
+
+def init_colors():
+    curses.start_color()
+    curses.init_pair(COLOR_APPLE,curses.COLOR_RED,0)
+    curses.init_pair(COLOR_HEAD,curses.COLOR_GREEN,0)
+    curses.init_pair(COLOR_BODY,curses.COLOR_CYAN,0)
+    curses.init_pair(COLOR_MENU_SELECTED,curses.COLOR_YELLOW,0)
+    curses.init_pair(COLOR_MENU_NORMAL,curses.COLOR_WHITE,0)
+
+def main(stdscr):
+    init_colors()
+    while True:
+        choice = main_menu(stdscr)
+        if choice=="Play": game_loop(stdscr)
+        else: break
+
+if __name__=="__main__":
+    curses.wrapper(main)

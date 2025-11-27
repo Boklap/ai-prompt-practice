@@ -143,20 +143,33 @@ def init_colors():
       3 -> food yellow
       4 -> wall/box grey
     """
-    
+
     if not curses.has_colors():
         return
+
     curses.start_color()
     try:
         curses.use_default_colors()
     except Exception:
-        pass
+        pass  # some terminals raise an error, ignore
 
-    # Standard 8-color pairs
-    curses.init_pair(1, curses.COLOR_WHITE, -1)   # neutral text
-    curses.init_pair(2, curses.COLOR_CYAN, -1)    # snake head
-    curses.init_pair(3, curses.COLOR_YELLOW, -1)  # food
-    curses.init_pair(4, curses.COLOR_MAGENTA, -1) # walls
+    # Check if terminal supports 256 colors
+    has_256 = False
+    if curses.COLORS >= 256:
+        has_256 = True
+
+    if has_256:
+        # Use 256-color indices (better visuals)
+        curses.init_pair(1, 250, -1)  # neutral body (light grey)
+        curses.init_pair(2, 81, -1)   # head cyan
+        curses.init_pair(3, 226, -1)  # food yellow
+        curses.init_pair(4, 239, -1)  # walls dark grey
+    else:
+        # fallback to standard 8-color palette
+        curses.init_pair(1, curses.COLOR_WHITE, -1)
+        curses.init_pair(2, curses.COLOR_CYAN, -1)
+        curses.init_pair(3, curses.COLOR_YELLOW, -1)
+        curses.init_pair(4, curses.COLOR_MAGENTA, -1)
 
     # curses.start_color()
     # # allow default background
@@ -169,22 +182,52 @@ def init_colors():
     # curses.init_pair(2, 81, -1)    # accent cyan
     # curses.init_pair(3, 226, -1)   # food yellow
     # curses.init_pair(4, 239, -1)   # walls
-
+    
 def draw_border(win, conf: Config):
-    """Draw the window border using box-drawing characters."""
+    """Draw the window border using box-drawing characters safely."""
+    h, w = win.getmaxyx()  # actual window size (may be smaller than conf)
+    
     # Top and bottom
-    for x in range(conf.width):
-        win.addch(0, x, '─', curses.color_pair(4))
-        win.addch(conf.height - 1, x, '─', curses.color_pair(4))
+    for x in range(min(conf.width, w)):
+        try:
+            win.addch(0, x, '─', curses.color_pair(4))
+            win.addch(min(conf.height - 1, h-1), x, '─', curses.color_pair(4))
+        except curses.error:
+            pass
+    
     # Left and right
-    for y in range(conf.height):
-        win.addch(y, 0, '│', curses.color_pair(4))
-        win.addch(y, conf.width - 1, '│', curses.color_pair(4))
+    for y in range(min(conf.height, h)):
+        try:
+            win.addch(y, 0, '│', curses.color_pair(4))
+            win.addch(y, min(conf.width - 1, w-1), '│', curses.color_pair(4))
+        except curses.error:
+            pass
+
     # Corners
-    win.addch(0, 0, '┌', curses.color_pair(4))
-    win.addch(0, conf.width - 1, '┐', curses.color_pair(4))
-    win.addch(conf.height - 1, 0, '└', curses.color_pair(4))
-    win.addch(conf.height - 1, conf.width - 1, '┘', curses.color_pair(4))
+    try: win.addch(0, 0, '┌', curses.color_pair(4))
+    except curses.error: pass
+    try: win.addch(0, min(conf.width - 1, w-1), '┐', curses.color_pair(4))
+    except curses.error: pass
+    try: win.addch(min(conf.height - 1, h-1), 0, '└', curses.color_pair(4))
+    except curses.error: pass
+    try: win.addch(min(conf.height - 1, h-1), min(conf.width - 1, w-1), '┘', curses.color_pair(4))
+    except curses.error: pass
+
+# def draw_border(win, conf: Config):
+#     """Draw the window border using box-drawing characters."""
+#     # Top and bottom
+#     for x in range(conf.width):
+#         win.addch(0, x, '─', curses.color_pair(4))
+#         win.addch(conf.height - 1, x, '─', curses.color_pair(4))
+#     # Left and right
+#     for y in range(conf.height):
+#         win.addch(y, 0, '│', curses.color_pair(4))
+#         win.addch(y, conf.width - 1, '│', curses.color_pair(4))
+#     # Corners
+#     win.addch(0, 0, '┌', curses.color_pair(4))
+#     win.addch(0, conf.width - 1, '┐', curses.color_pair(4))
+#     win.addch(conf.height - 1, 0, '└', curses.color_pair(4))
+#     win.addch(conf.height - 1, conf.width - 1, '┘', curses.color_pair(4))
 
 def render(stdscr, conf: Config, state: GameState) -> None:
     """
