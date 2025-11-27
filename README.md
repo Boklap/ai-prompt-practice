@@ -1,2 +1,5 @@
 # ai-prompt-practice
-Projects that created by following the best practice on prompting.
+Store all project that created by several AIs by following prompting best practices.
+
+In this project:
+1. **Snake Game**
